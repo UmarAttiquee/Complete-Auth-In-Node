@@ -1,0 +1,20 @@
+npm init -y                                            install Package.json
+npm i -g nodemon                                       automoatic run server
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser    Yh Javascript ki filr ko bar bar backend pr run kara ga
+npm i express                                           Express JS Install
+npm i dotenv                                            Create env file
+npm install mongodb                              
+npm i mongodb
+npm i mongoose
+npm i cors
+
+
+npm i bcryptjs 
+npm i jsonwebtoken
+npm install nodemailer
+npm i handlebars
+
+
+
+npm i axios
+npm i react-toastify
