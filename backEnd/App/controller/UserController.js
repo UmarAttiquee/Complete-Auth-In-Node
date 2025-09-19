@@ -50,7 +50,7 @@ const registerUser = async (req, res) => {
 
     // 6. Generate verification token (1 hour expiry)
     const token = jwt.sign({ id: user._id }, process.env.SECRET_KEY, {
-      expiresIn: "1h",
+      expiresIn: "1m",
     });
 
     // 7. Send verification email
@@ -347,6 +347,58 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const resendVerificationEmail = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      status: 0,
+      message: "Email is required",
+    });
+  }
+
+  try {
+    const user = await UserModel.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 0,
+        message: "User not found",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({
+        status: 0,
+        message: "User already verified",
+      });
+    }
+
+    const newToken = jwt.sign({ id: user._id }, process.env.SECRET_KEY, {
+      expiresIn: "15m", // Increased for debug
+    });
+
+    user.token = newToken;
+    await user.save();
+
+    console.log("Resending verification email to:", email);
+    await verifyEmail(newToken, email);
+
+    return res.status(200).json({
+      status: 1,
+      message: "Verification email resent successfully",
+    });
+  } catch (error) {
+    console.error("Error resending verification email:", error);
+    return res.status(500).json({
+      status: 0,
+      message: "Failed to resend verification email",
+      error: error.message,
+    });
+  }
+};
+
+module.exports = { resendVerificationEmail };
 // ============================
 // EXPORT CONTROLLERS
 // ============================
@@ -357,4 +409,5 @@ module.exports = {
   logout,
   resetPassword,
   forgotPassword,
+  resendVerificationEmail,
 };

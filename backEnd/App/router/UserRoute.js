@@ -7,6 +7,7 @@ const {
   forgotPassword,
   resetPassword,
   logout,
+  resendVerificationEmail,
 } = require("../controller/UserController");
 const isAuthenticated = require("../middlewares/isAuthenticated");
 
@@ -19,5 +20,6 @@ UserRouter.post("/login", login);
 UserRouter.post("/logout", isAuthenticated, logout);
 UserRouter.post("/forgot-password", forgotPassword);
 UserRouter.post("/reset-password", resetPassword);
+UserRouter.post("/resend-verification", resendVerificationEmail);
 
 module.exports = UserRouter;
