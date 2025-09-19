@@ -13,7 +13,7 @@ npm i bcryptjs
 npm i jsonwebtoken
 npm install nodemailer
 npm i handlebars
-
+npm i yup
 
 
 npm i axios
