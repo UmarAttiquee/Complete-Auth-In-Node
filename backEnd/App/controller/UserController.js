@@ -4,14 +4,10 @@
 const jwt = require("jsonwebtoken"); // For generating and verifying JWT tokens
 const bcrypt = require("bcryptjs"); // For hashing and comparing passwords
 const UserModel = require("../model/UserModel"); // Mongoose User model
-const {
-  verifyEmail,
-  sendResetPasswordEmail,
-} = require("../EmailVerify/EmailVerify"); // Email sending functions
-const SessionSchemaModeal = require("../model/sessionModel");
-// const { sendOtpMail } = require("../EmailVerify/Otp");
+const { verifyEmail } = require("../EmailVerify/EmailVerify"); // Email sending functions
 const sendOtpMail = require("../EmailVerify/Otp"); // ✅ correct for default export
 const SessionSchemaModel = require("../model/sessionModel");
+const SessionSchemaModeal = require("../model/sessionModel");
 
 //
 // ============================
@@ -183,11 +179,11 @@ const login = async (req, res) => {
       userID: user._id,
     });
     if (existingSession) {
-      await SessionSchemaModeal.deleteOne({ userID: user._id });
+      await SessionSchemaModel.deleteOne({ userID: user._id });
     }
 
     //create Session
-    await SessionSchemaModeal.create({ userID: user._id });
+    await SessionSchemaModel.create({ userID: user._id });
 
     // 5. Generate session token (7 days expiry)
     const accessToken = jwt.sign({ id: user._id }, process.env.SECRET_KEY, {
@@ -292,8 +288,6 @@ const forgotPassword = async (req, res) => {
     });
   }
 };
-
-module.exports = forgotPassword;
 
 // ============================
 // RESET PASSWORD CONTROLLER
