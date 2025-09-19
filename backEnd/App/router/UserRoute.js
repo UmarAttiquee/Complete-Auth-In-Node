@@ -12,7 +12,7 @@ const isAuthenticated = require("../middlewares/isAuthenticated");
 const UserRouter = express.Router();
 
 // Route to register a new user
-UserRouter.post("/user", registerUser);
+UserRouter.post("/register", registerUser);
 
 // Routes to handle email verification (supports both POST and GET)
 UserRouter.post("/verify", verification);
@@ -28,6 +28,6 @@ UserRouter.post("/logout", isAuthenticated, logout);
 UserRouter.post("/forgot-password", forgotPassword);
 
 // Route to reset password using token (token passed as URL param)
-UserRouter.post("/reset-password/:token", resetPassword);
+UserRouter.post("/reset-password", resetPassword);
 
 module.exports = UserRouter;

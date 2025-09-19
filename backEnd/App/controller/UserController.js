@@ -8,7 +8,12 @@ const {
   verifyEmail,
   sendResetPasswordEmail,
 } = require("../EmailVerify/EmailVerify"); // Email sending functions
+const SessionSchemaModeal = require("../model/sessionModel");
+// const { sendOtpMail } = require("../EmailVerify/Otp");
+const sendOtpMail = require("../EmailVerify/Otp"); // ✅ correct for default export
+const SessionSchemaModel = require("../model/sessionModel");
 
+//
 // ============================
 // REGISTER USER CONTROLLER
 // ============================
@@ -173,13 +178,28 @@ const login = async (req, res) => {
         .json({ status: 0, message: "Invalid credentials" });
     }
 
+    //Check sessions
+    const existingSession = await SessionSchemaModeal.findOne({
+      userID: user._id,
+    });
+    if (existingSession) {
+      await SessionSchemaModeal.deleteOne({ userID: user._id });
+    }
+
+    //create Session
+    await SessionSchemaModeal.create({ userID: user._id });
+
     // 5. Generate session token (7 days expiry)
-    const token = jwt.sign({ id: user._id }, process.env.SECRET_KEY, {
+    const accessToken = jwt.sign({ id: user._id }, process.env.SECRET_KEY, {
+      expiresIn: "7d",
+    });
+
+    const refreshToken = jwt.sign({ id: user._id }, process.env.SECRET_KEY, {
       expiresIn: "7d",
     });
 
     // 6. Save token and login status
-    user.token = token;
+    user.token = accessToken;
     user.isLoggedIn = true;
     await user.save();
 
@@ -188,10 +208,11 @@ const login = async (req, res) => {
       message: "Login successful",
       data: {
         id: user._id,
+        isLoggedIn: true,
         username: user.username,
         email: user.email,
-        token,
-        isLoggedIn: true,
+        accessToken,
+        refreshToken,
       },
     });
   } catch (err) {
@@ -213,6 +234,10 @@ const logout = async (req, res) => {
     // Invalidate session
     user.token = null;
     user.isLoggedIn = false;
+    const userId = req.userId;
+    await SessionSchemaModeal.deleteMany(userId);
+    await UserModel.findByIdAndUpdate(userId, { isLoggedIn: false });
+
     await user.save();
 
     return res.status(200).json({
@@ -231,32 +256,33 @@ const logout = async (req, res) => {
 // ============================
 // FORGOT PASSWORD CONTROLLER
 // ============================
+
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
-  // 1. Validate input
   if (!email) {
     return res.status(400).json({ status: 0, message: "Email is required" });
   }
 
   try {
-    // 2. Check if user exists
     const user = await UserModel.findOne({ email: email.toLowerCase() });
+
     if (!user) {
       return res.status(404).json({ status: 0, message: "User not found" });
     }
 
-    // 3. Generate reset token (15 minutes)
-    const token = jwt.sign({ id: user._id }, process.env.SECRET_KEY, {
-      expiresIn: "15m",
-    });
+    const otp = Math.floor(100000 + Math.random() * 900000); // 6-digit OTP
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // 4. Send reset email
-    await sendResetPasswordEmail(user.email, token);
+    user.otp = otp;
+    user.otpExpire = otpExpiry;
+    await user.save();
+
+    await sendOtpMail(email, otp);
 
     return res.status(200).json({
       status: 1,
-      message: "Password reset link sent to your email.",
+      message: "OTP sent to your email.",
     });
   } catch (err) {
     return res.status(500).json({
@@ -267,45 +293,61 @@ const forgotPassword = async (req, res) => {
   }
 };
 
+module.exports = forgotPassword;
+
 // ============================
 // RESET PASSWORD CONTROLLER
 // ============================
 const resetPassword = async (req, res) => {
-  const { token } = req.params;
-  const { newPassword } = req.body;
+  const { email, otp, newPassword } = req.body;
 
-  // 1. Validate input
-  if (!newPassword) {
-    return res
-      .status(400)
-      .json({ status: 0, message: "New password is required" });
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({ status: 0, message: "All fields required" });
   }
 
   try {
-    // 2. Verify token
-    const decoded = jwt.verify(token, process.env.SECRET_KEY);
+    const user = await UserModel.findOne({ email: email.toLowerCase() });
 
-    // 3. Find user
-    const user = await UserModel.findById(decoded.id);
     if (!user) {
       return res.status(404).json({ status: 0, message: "User not found" });
     }
 
-    // 4. Hash and save new password
+    // Optional: ensure types match
+    const userOtp =
+      typeof user.otp === "number" ? user.otp : parseInt(user.otp);
+
+    if (
+      userOtp !== parseInt(otp) ||
+      !user.otpExpire ||
+      user.otpExpire < new Date()
+    ) {
+      return res
+        .status(400)
+        .json({ status: 0, message: "Invalid or expired OTP" });
+    }
+
+    // Update password
     user.password = await bcrypt.hash(newPassword, 15);
+
+    // Clear OTP fields
+    user.otp = null;
+    user.otpExpire = null;
+
+    // Optional: Invalidate sessions
+    await SessionSchemaModel.deleteMany({ userID: user._id });
+    user.token = null;
+    user.isLoggedIn = false;
+
     await user.save();
 
     return res.status(200).json({
       status: 1,
-      message: "Password has been reset successfully",
+      message: "Password reset successfully",
     });
   } catch (err) {
-    return res.status(400).json({
+    return res.status(500).json({
       status: 0,
-      message:
-        err.name === "TokenExpiredError"
-          ? "Reset token has expired. Please try again."
-          : "Invalid or expired token",
+      message: "Error resetting password",
       error: err.message,
     });
   }
